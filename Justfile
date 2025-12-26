@@ -9,7 +9,7 @@ build:
     gcc {{NAME}}.c -o {{EXE}} -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
 
 run: build
-    ./{{EXE}}
+    {{EXE}}
 
 clean:
     rm -rf {{BIN}}
