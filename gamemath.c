@@ -1,11 +1,9 @@
 #include "raylib.h"
 
-#define COLOR(r, g, b) CLITERAL(Color){r, g, b, 0xFF}
+#include "colors.h"
+
 #define VECTOR3(x, y, z) \
     CLITERAL(Vector3) { x, y, z }
-
-#define BACKGROUND COLOR(0x00, 0x00, 0x00)
-#define FOREGROUND COLOR(0xFA, 0xFA, 0xFA)
 
 #define FONT_PATH "fonts/computer-modern/cmunrm.ttf"
 #define FONT_SIZE 32
@@ -13,6 +11,36 @@
 #define EXTENT 10
 
 static Font font;
+
+typedef struct
+{
+    Mesh cone;
+    Mesh cylinder;
+} Meshes;
+
+Meshes gen_meshes()
+{
+    Meshes meshes = {
+        .cone = GenMeshCone(0.5, 1, 32),
+        .cylinder = GenMeshCylinder(0.5, 1, 32)};
+
+    return meshes;
+}
+
+typedef struct
+{
+    Model cone;
+    Model cylinder;
+} Models;
+
+Models load_models(Meshes meshes)
+{
+    Models models = {
+        .cone = LoadModelFromMesh(meshes.cone),
+        .cylinder = LoadModelFromMesh(meshes.cylinder)};
+
+    return models;
+}
 
 float sign(float value)
 {
@@ -91,69 +119,61 @@ void draw_guidelines(Vector3 camera_position)
     }
 }
 
-void draw_axes(Vector3 camera_position)
+void draw_axes(Vector3 camera_position, Models models)
 {
     bool neg_x = camera_position.x < 0;
     bool neg_y = camera_position.y < 0;
     bool neg_z = camera_position.z < 0;
 
+    Vector3 xAxis = {1, 0, 0};
+    Vector3 yAxis = {0, 1, 0};
+    Vector3 zAxis = {0, 0, 1};
+
+    Vector3 zero = {0.0f, 0.0f, 0.0f};
+    float length = EXTENT;
+    float thickness = 0.25f;
+
+    Vector3 scale = {thickness, length, thickness};
+
+    Color xOn = RED_600;
+    Color yOn = GREEN_600;
+    Color zOn = BLUE_600;
+
+    Color xOff = RED_950;
+    Color yOff = GREEN_950;
+    Color zOff = BLUE_950;
+
+    Color xPos = neg_x ? xOff : xOn;
+    Color yPos = neg_y ? yOff : yOn;
+    Color zPos = neg_z ? zOff : zOn;
+
+    Color xNeg = neg_x ? xOn : xOff;
+    Color yNeg = neg_y ? yOn : yOff;
+    Color zNeg = neg_z ? zOn : zOff;
+
     // axis
     {
-        Vector3 zero = {0.0f, 0.0f, 0.0f};
-        float length = EXTENT;
-        float thickness = 0.1f;
-
-        float ax = neg_x ? 0.25 : 1.0;
-        float ay = neg_y ? 0.25 : 1.0;
-        float az = neg_z ? 0.25 : 1.0;
-
-        Color cx = {0xFF, 0x00, 0x00, ax * 0xFF};
-        Color cy = {0x00, 0xFF, 0x00, ay * 0xFF};
-        Color cz = {0x00, 0x00, 0xFF, az * 0xFF};
-
-        float p = EXTENT / 2;
-        Vector3 px = {p, 0, 0};
-        Vector3 py = {0, p, 0};
-        Vector3 pz = {0, 0, p};
-
-        DrawCube(px, length, thickness, thickness, cx);
-        DrawCube(py, thickness, length, thickness, cy);
-        DrawCube(pz, thickness, thickness, length, cz);
-    }
-
-    {
-        float length = EXTENT;
-        float thickness = 0.1f;
-
-        float ax = neg_x ? 1.0 : 0.25;
-        float ay = neg_y ? 1.0 : 0.25;
-        float az = neg_z ? 1.0 : 0.25;
-
-        Color cx = {0xFF, 0x00, 0x00, ax * 0xFF};
-        Color cy = {0x00, 0xFF, 0x00, ay * 0xFF};
-        Color cz = {0x00, 0x00, 0xFF, az * 0xFF};
-
-        float p = -EXTENT / 2;
-        Vector3 px = {p, 0, 0};
-        Vector3 py = {0, p, 0};
-        Vector3 pz = {0, 0, p};
-
-        DrawCube(px, length, thickness, thickness, cx);
-        DrawCube(py, thickness, length, thickness, cy);
-        DrawCube(pz, thickness, thickness, length, cz);
+        DrawModelEx(models.cylinder, zero, zAxis, -90, scale, xPos);
+        DrawModelEx(models.cylinder, zero, zAxis, 90, scale, xNeg);
+        DrawModelEx(models.cylinder, zero, yAxis, 0, scale, yPos);
+        DrawModelEx(models.cylinder, zero, xAxis, 180, scale, yNeg);
+        DrawModelEx(models.cylinder, zero, xAxis, 90, scale, zPos);
+        DrawModelEx(models.cylinder, zero, xAxis, -90, scale, zNeg);
     }
 
     // tips
     {
-        float size = 0.5f;
+        float size = 1.0f;
+
+        Vector3 scale = {size, size, size};
+
         Vector3 x_end = {EXTENT, 0, 0};
-        DrawCube(x_end, size, size, size, RED);
-
         Vector3 y_end = {0, EXTENT, 0};
-        DrawCube(y_end, size, size, size, GREEN);
-
         Vector3 z_end = {0, 0, EXTENT};
-        DrawCube(z_end, size, size, size, BLUE);
+
+        DrawModelEx(models.cone, x_end, zAxis, -90, scale, neg_x ? RED_900 : RED_500);
+        DrawModelEx(models.cone, y_end, yAxis, 0, scale, neg_y ? GREEN_900 : GREEN_500);
+        DrawModelEx(models.cone, z_end, xAxis, 90, scale, neg_z ? BLUE_900 : BLUE_500);
     }
 }
 
@@ -409,7 +429,7 @@ void draw_controls(Mouse mouse, Input *input)
 
         {
             const char *text = "Perspective";
-            
+
             Rectangle toggle;
             Vector2 text_position;
             contain_text(toggle_position, font_style, padding, text, &toggle, &text_position);
@@ -447,10 +467,14 @@ void draw_controls(Mouse mouse, Input *input)
 
 int main(void)
 {
-    const int screenWidth = 1920;
-    const int screenHeight = 1080;
+    const int screenWidth = 16 * 100;
+    const int screenHeight = 9 * 100;
 
     InitWindow(screenWidth, screenHeight, "Game Math");
+    SetWindowState(FLAG_WINDOW_RESIZABLE);
+
+    Meshes meshes = gen_meshes();
+    Models models = load_models(meshes);
 
     RenderTexture2D background = LoadRenderTexture(screenWidth, screenHeight);
 
@@ -534,7 +558,7 @@ int main(void)
             {
                 BeginMode3D(camera);
 
-                draw_axes(camera.position);
+                draw_axes(camera.position, models);
 
                 EndMode3D();
             }
