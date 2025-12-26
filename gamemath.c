@@ -5,6 +5,12 @@
 #define VECTOR3(x, y, z) \
     CLITERAL(Vector3) { x, y, z }
 
+#define VECTOR3_ZERO VECTOR3(0,0,0)
+#define VECTOR3_ONE VECTOR3(1,1,1)
+#define VECTOR3_RIGHT VECTOR3(1,0,0)
+#define VECTOR3_UP VECTOR3(0,1,0)
+#define VECTOR3_FORWARD VECTOR3(0,0,1)
+
 #define FONT_PATH "fonts/computer-modern/cmunrm.ttf"
 #define FONT_SIZE 32
 
@@ -16,13 +22,16 @@ typedef struct
 {
     Mesh cone;
     Mesh cylinder;
+    Mesh knot;
 } Meshes;
 
 Meshes gen_meshes()
 {
     Meshes meshes = {
-        .cone = GenMeshCone(0.5, 1, 32),
-        .cylinder = GenMeshCylinder(0.5, 1, 32)};
+        .cone = GenMeshCone(1, 2, 32),
+        .cylinder = GenMeshCylinder(1, 2, 16),
+        .knot = GenMeshKnot(1, 2, 16, 128),
+    };
 
     return meshes;
 }
@@ -31,13 +40,16 @@ typedef struct
 {
     Model cone;
     Model cylinder;
+    Model knot;
 } Models;
 
 Models load_models(Meshes meshes)
 {
     Models models = {
         .cone = LoadModelFromMesh(meshes.cone),
-        .cylinder = LoadModelFromMesh(meshes.cylinder)};
+        .cylinder = LoadModelFromMesh(meshes.cylinder),
+        .knot = LoadModelFromMesh(meshes.knot),
+    };
 
     return models;
 }
@@ -54,11 +66,10 @@ void draw_guidelines(Vector3 camera_position)
     float sign_z = sign(camera_position.z);
 
     float to = EXTENT;
-    unsigned char alpha = 0.5f * 0xFF;
-
-    Color color_x = {0xFF, 0, 0, alpha};
-    Color color_y = {0, 0xFF, 0, alpha};
-    Color color_z = {0, 0, 0xFF, alpha};
+    
+    Color color_x = RED_950;
+    Color color_y = GREEN_950;
+    Color color_z = BLUE_950;
 
     for (int i = 0; i <= EXTENT; ++i)
     {
@@ -125,13 +136,8 @@ void draw_axes(Vector3 camera_position, Models models)
     bool neg_y = camera_position.y < 0;
     bool neg_z = camera_position.z < 0;
 
-    Vector3 xAxis = {1, 0, 0};
-    Vector3 yAxis = {0, 1, 0};
-    Vector3 zAxis = {0, 0, 1};
-
-    Vector3 zero = {0.0f, 0.0f, 0.0f};
-    float length = EXTENT;
-    float thickness = 0.25f;
+    float length = EXTENT / 2;
+    float thickness = 0.1f;
 
     Vector3 scale = {thickness, length, thickness};
 
@@ -153,17 +159,17 @@ void draw_axes(Vector3 camera_position, Models models)
 
     // axis
     {
-        DrawModelEx(models.cylinder, zero, zAxis, -90, scale, xPos);
-        DrawModelEx(models.cylinder, zero, zAxis, 90, scale, xNeg);
-        DrawModelEx(models.cylinder, zero, yAxis, 0, scale, yPos);
-        DrawModelEx(models.cylinder, zero, xAxis, 180, scale, yNeg);
-        DrawModelEx(models.cylinder, zero, xAxis, 90, scale, zPos);
-        DrawModelEx(models.cylinder, zero, xAxis, -90, scale, zNeg);
+        DrawModelEx(models.cylinder, VECTOR3_ZERO, VECTOR3_FORWARD, -90, scale, xPos);
+        DrawModelEx(models.cylinder, VECTOR3_ZERO, VECTOR3_FORWARD, 90, scale, xNeg);
+        DrawModelEx(models.cylinder, VECTOR3_ZERO, VECTOR3_UP, 0, scale, yPos);
+        DrawModelEx(models.cylinder, VECTOR3_ZERO, VECTOR3_RIGHT, 180, scale, yNeg);
+        DrawModelEx(models.cylinder, VECTOR3_ZERO, VECTOR3_RIGHT, 90, scale, zPos);
+        DrawModelEx(models.cylinder, VECTOR3_ZERO, VECTOR3_RIGHT, -90, scale, zNeg);
     }
 
     // tips
     {
-        float size = 1.0f;
+        float size = 0.4f;
 
         Vector3 scale = {size, size, size};
 
@@ -171,9 +177,9 @@ void draw_axes(Vector3 camera_position, Models models)
         Vector3 y_end = {0, EXTENT, 0};
         Vector3 z_end = {0, 0, EXTENT};
 
-        DrawModelEx(models.cone, x_end, zAxis, -90, scale, neg_x ? RED_900 : RED_500);
-        DrawModelEx(models.cone, y_end, yAxis, 0, scale, neg_y ? GREEN_900 : GREEN_500);
-        DrawModelEx(models.cone, z_end, xAxis, 90, scale, neg_z ? BLUE_900 : BLUE_500);
+        DrawModelEx(models.cone, x_end, VECTOR3_FORWARD, -90, scale, neg_x ? RED_900 : RED_500);
+        DrawModelEx(models.cone, y_end, VECTOR3_UP, 0, scale, neg_y ? GREEN_900 : GREEN_500);
+        DrawModelEx(models.cone, z_end, VECTOR3_RIGHT, 90, scale, neg_z ? BLUE_900 : BLUE_500);
     }
 }
 
@@ -275,11 +281,11 @@ bool draw_toggle(Rectangle rectangle, Mouse mouse, bool enabled)
 {
     if (enabled)
     {
-        DrawRectangleRec(rectangle, WHITE);
+        DrawRectangleRec(rectangle, FOREGROUND);
     }
     else
     {
-        DrawRectangleLinesEx(rectangle, 1, WHITE);
+        DrawRectangleLinesEx(rectangle, 1, FOREGROUND);
     }
 
     if (!enabled && mouse.left_pressed && rectangle_contains_point(rectangle, mouse.position_left_pressed))
@@ -315,7 +321,7 @@ float draw_slider(Rectangle rectangle, float handle_width, Color handle_color, f
     }
 
     DrawRectangleRec(handle, handle_color);
-    DrawRectangleLinesEx(rectangle, 1, WHITE);
+    DrawRectangleLinesEx(rectangle, 1, FOREGROUND);
 
     return value;
 }
@@ -335,11 +341,11 @@ void draw_controls(Mouse mouse, Input *input)
             .width = 320,
             .height = FONT_SIZE,
         };
-        value = draw_slider(slider, FONT_SIZE, RED, -100, 100, value, mouse);
+        value = draw_slider(slider, FONT_SIZE, RED_600, -100, 100, value, mouse);
 
         Vector2 position = right_of(slider, 8);
         const char *text = TextFormat("x: %.2f", value);
-        DrawTextEx(font, text, position, FONT_SIZE, 1, WHITE);
+        DrawTextEx(font, text, position, FONT_SIZE, 1, FOREGROUND);
 
         input->x = value;
         y += slider.height;
@@ -357,11 +363,11 @@ void draw_controls(Mouse mouse, Input *input)
             .width = 320,
             .height = FONT_SIZE,
         };
-        value = draw_slider(slider, FONT_SIZE, GREEN, -100, 100, value, mouse);
+        value = draw_slider(slider, FONT_SIZE, GREEN_600, -100, 100, value, mouse);
 
         Vector2 position = right_of(slider, 8);
         const char *text = TextFormat("y: %.2f", value);
-        DrawTextEx(font, text, position, FONT_SIZE, 1, WHITE);
+        DrawTextEx(font, text, position, FONT_SIZE, 1, FOREGROUND);
 
         input->y = value;
         y += slider.height;
@@ -379,11 +385,11 @@ void draw_controls(Mouse mouse, Input *input)
             .width = 320,
             .height = FONT_SIZE,
         };
-        value = draw_slider(slider, FONT_SIZE, BLUE, -100, 100, value, mouse);
+        value = draw_slider(slider, FONT_SIZE, BLUE_600, -100, 100, value, mouse);
 
         Vector2 position = right_of(slider, 8);
         const char *text = TextFormat("z: %.2f", value);
-        DrawTextEx(font, text, position, FONT_SIZE, 1, WHITE);
+        DrawTextEx(font, text, position, FONT_SIZE, 1, FOREGROUND);
 
         input->z = value;
         y += slider.height;
@@ -405,7 +411,7 @@ void draw_controls(Mouse mouse, Input *input)
 
         Vector2 position = right_of(slider, 8);
         const char *text = TextFormat("fov: %.2f", value);
-        DrawTextEx(font, text, position, FONT_SIZE, 1, WHITE);
+        DrawTextEx(font, text, position, FONT_SIZE, 1, FOREGROUND);
 
         input->fovy = value;
         y += slider.height;
@@ -441,7 +447,7 @@ void draw_controls(Mouse mouse, Input *input)
                 input->projection = CAMERA_PERSPECTIVE;
             }
 
-            draw_text(font_style, text_position, text, enabled ? BLACK : WHITE);
+            draw_text(font_style, text_position, text, enabled ? BACKGROUND : FOREGROUND);
 
             toggle_position.x += toggle.width;
         }
@@ -460,7 +466,7 @@ void draw_controls(Mouse mouse, Input *input)
                 input->projection = CAMERA_ORTHOGRAPHIC;
             }
 
-            draw_text(font_style, text_position, text, enabled ? BLACK : WHITE);
+            draw_text(font_style, text_position, text, enabled ? BACKGROUND : FOREGROUND);
         }
     }
 }
@@ -479,7 +485,7 @@ int main(void)
     RenderTexture2D background = LoadRenderTexture(screenWidth, screenHeight);
 
     Camera3D camera = {
-        .position = (Vector3){-2 * EXTENT, 2 * EXTENT, -2 * EXTENT},
+        .position = (Vector3){2 * EXTENT, 2 * EXTENT, 2 * EXTENT},
         .target = (Vector3){0.0f, 0.0f, 0.0f},
         .up = (Vector3){0.0f, 1.0f, 0.0f},
         .fovy = 45.0f,
@@ -559,6 +565,8 @@ int main(void)
                 BeginMode3D(camera);
 
                 draw_axes(camera.position, models);
+
+                // DrawModel(models.knot, VECTOR3_ZERO, 3, WHITE);
 
                 EndMode3D();
             }
